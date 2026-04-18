@@ -128,6 +128,15 @@
   #picture-display { width: 100%; height: 100%; object-fit: contain; display: none; }
   #picture-display.visible { display: block; }
 
+  #img-error {
+    display: none; flex-direction: column; align-items: center; gap: 12px;
+    color: var(--danger); text-align: center; padding: 24px;
+  }
+  #img-error.show { display: flex; }
+  #img-error svg { opacity: 0.7; }
+  #img-error p { font-size: 0.9rem; letter-spacing: 2px; }
+  #img-error code { font-size: 0.75rem; color: var(--muted); letter-spacing: 1px; }
+
   #placeholder { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--muted); }
   #placeholder svg { opacity: 0.3; }
   #placeholder p { font-size: 1rem; letter-spacing: 2px; }
@@ -273,6 +282,13 @@
       <button id="start-btn" onclick="startRound()">&#9654; START</button>
     </div>
     <img id="picture-display" alt="Quiz picture" />
+    <div id="img-error">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+      </svg>
+      <p>IMAGE NOT FOUND</p>
+      <code id="img-error-path"></code>
+    </div>
     <div id="pic-number"></div>
     <div id="answer-overlay">
       <div id="answer-label">ANSWER</div>
@@ -431,27 +447,52 @@ document.getElementById('category-select').addEventListener('change', function()
 });
 
 // ── IMAGE DISPLAY ─────────────────────────────────────────────────────────────
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+async function findImageHandle(dirHandle, filename) {
+  try { return await dirHandle.getFileHandle(filename); } catch {}
+  const base = filename.replace(/\.[^.]+$/, '');
+  for (const ext of IMAGE_EXTS) {
+    try { return await dirHandle.getFileHandle(`${base}.${ext}`); } catch {}
+  }
+  return null;
+}
+
 async function showPicture(idx) {
   if (!pictures.length) return;
   picIndex = idx;
   const q     = pictures[idx];
   const parts = q.path.split('/');
+
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('get-ready').classList.remove('show');
+  document.getElementById('img-error').classList.remove('show');
+  document.getElementById('picture-display').classList.remove('visible');
+
   try {
     let handle = rootDirHandle;
     for (let i = 0; i < parts.length - 1; i++)
       handle = await handle.getDirectoryHandle(parts[i]);
-    const fh   = await handle.getFileHandle(parts[parts.length - 1]);
-    const url  = URL.createObjectURL(await fh.getFile());
-    const img  = document.getElementById('picture-display');
-    img.onload = () => URL.revokeObjectURL(url);
-    img.src    = url;
-    img.classList.add('visible');
-    document.getElementById('placeholder').style.display = 'none';
-    document.getElementById('get-ready').classList.remove('show');
-    const badge = document.getElementById('pic-number');
-    badge.textContent = `# ${idx + 1}`;
-    badge.classList.add('visible');
-  } catch(e) { console.error('Cannot load image:', q.path, e); }
+    const fh = await findImageHandle(handle, parts[parts.length - 1]);
+    if (!fh) {
+      document.getElementById('img-error-path').textContent = q.path;
+      document.getElementById('img-error').classList.add('show');
+    } else {
+      const url = URL.createObjectURL(await fh.getFile());
+      const img = document.getElementById('picture-display');
+      img.onload = () => URL.revokeObjectURL(url);
+      img.src    = url;
+      img.classList.add('visible');
+    }
+  } catch(e) {
+    console.error('Cannot load image:', q.path, e);
+    document.getElementById('img-error-path').textContent = q.path;
+    document.getElementById('img-error').classList.add('show');
+  }
+
+  const badge = document.getElementById('pic-number');
+  badge.textContent = `# ${idx + 1}`;
+  badge.classList.add('visible');
   updateCounter();
 }
 
