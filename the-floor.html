@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE FLOOR — Picture Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: #111118;
+    --border: #2a2a3a;
+    --accent: #e8c44a;
+    --p1: #4a9ee8;
+    --p1-glow: rgba(74,158,232,0.35);
+    --p2: #e84a7a;
+    --p2-glow: rgba(232,74,122,0.35);
+    --text: #f0f0f8;
+    --muted: #666680;
+    --danger: #e84a4a;
+    --warning: #e8a44a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  #logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem; letter-spacing: 4px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(232,196,74,0.5);
+    white-space: nowrap;
+  }
+  #category-controls {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1; justify-content: center;
+  }
+  #category-label { font-size: 0.75rem; letter-spacing: 2px; color: var(--muted); white-space: nowrap; }
+  #category-select {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem; font-weight: 600; padding: 6px 12px;
+    border-radius: 4px; cursor: pointer; min-width: 200px; letter-spacing: 1px;
+  }
+  #category-select:focus { outline: none; border-color: var(--accent); }
+  #load-btn {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.85rem; font-weight: 700;
+    letter-spacing: 2px; padding: 7px 16px; border-radius: 4px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.2s;
+  }
+  #load-btn:hover { background: var(--accent); color: var(--bg); }
+  #img-counter { font-size: 0.85rem; letter-spacing: 2px; color: var(--muted); white-space: nowrap; min-width: 100px; text-align: right; }
+
+  /* ── MAIN ── */
+  #main { display: grid; grid-template-columns: 220px 1fr 220px; flex: 1; overflow: hidden; }
+
+  /* ── PLAYER PANELS ── */
+  .player-panel {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: space-between; padding: 24px 16px;
+    border-right: 1px solid var(--border); transition: background 0.3s;
+  }
+  #player2-panel { border-right: none; border-left: 1px solid var(--border); }
+  .player-panel.active-p1 { background: rgba(74,158,232,0.07); }
+  .player-panel.active-p2 { background: rgba(232,74,122,0.07); }
+
+  .player-name-input {
+    background: transparent; border: none;
+    border-bottom: 2px solid var(--border);
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 3px;
+    text-align: center; width: 100%; outline: none;
+    transition: border-color 0.2s; padding-bottom: 4px;
+  }
+  #player1-panel .player-name-input { color: var(--p1); }
+  #player2-panel .player-name-input { color: var(--p2); }
+  .player-name-input:focus { border-bottom-color: var(--accent); }
+
+  .clock-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .clock {
+    font-family: 'Bebas Neue', sans-serif; font-size: 5rem; line-height: 1; letter-spacing: 4px;
+    transition: color 0.3s, text-shadow 0.3s;
+  }
+  #player1-panel .clock { color: var(--p1); text-shadow: 0 0 30px var(--p1-glow); }
+  #player2-panel .clock { color: var(--p2); text-shadow: 0 0 30px var(--p2-glow); }
+  .clock.warning { color: var(--warning) !important; text-shadow: 0 0 30px rgba(232,164,74,0.5) !important; }
+  .clock.danger  { color: var(--danger)  !important; text-shadow: 0 0 30px rgba(232,74,74,0.6)  !important; animation: pulse-danger 0.5s ease-in-out infinite; }
+  @keyframes pulse-danger { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .clock-label { font-size: 0.7rem; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; }
+
+  .score-wrap { text-align: center; }
+  .score-label { font-size: 0.65rem; letter-spacing: 2px; color: var(--muted); }
+  .score { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 2px; }
+  #player1-panel .score { color: var(--p1); }
+  #player2-panel .score { color: var(--p2); }
+
+  .active-indicator { width: 10px; height: 10px; border-radius: 50%; background: transparent; transition: all 0.3s; }
+  .player-panel.active-p1 #p1-dot { background: var(--p1); box-shadow: 0 0 14px var(--p1); }
+  .player-panel.active-p2 #p2-dot { background: var(--p2); box-shadow: 0 0 14px var(--p2); }
+
+  /* ── IMAGE AREA ── */
+  #image-area {
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; background: #08080e;
+  }
+  #picture-display { width: 100%; height: 100%; object-fit: contain; display: none; }
+  #picture-display.visible { display: block; }
+
+  #placeholder { display: flex; flex-direction: column; align-items: center; gap: 16px; color: var(--muted); }
+  #placeholder svg { opacity: 0.3; }
+  #placeholder p { font-size: 1rem; letter-spacing: 2px; }
+
+  /* Get Ready */
+  #get-ready { display: none; flex-direction: column; align-items: center; gap: 24px; }
+  #get-ready.show { display: flex; }
+  #get-ready-category { font-size: 0.75rem; letter-spacing: 4px; color: var(--muted); text-transform: uppercase; }
+  #get-ready-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 5rem; letter-spacing: 8px;
+    color: var(--accent); text-shadow: 0 0 40px rgba(232,196,74,0.45); line-height: 1;
+  }
+  #get-ready-pics { font-size: 0.85rem; letter-spacing: 2px; color: var(--muted); }
+  #start-btn {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 5px;
+    background: var(--accent); color: var(--bg); border: none; border-radius: 4px;
+    padding: 16px 56px; cursor: pointer;
+    box-shadow: 0 4px 32px rgba(232,196,74,0.35); transition: all 0.15s; margin-top: 8px;
+  }
+  #start-btn:hover { background: #f0d060; }
+  #start-btn:active { transform: scale(0.97); }
+
+  /* Picture number badge */
+  #pic-number {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(10,10,15,0.75); border: 1px solid var(--border);
+    color: var(--accent); font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem; letter-spacing: 3px; padding: 4px 14px;
+    border-radius: 4px; pointer-events: none; display: none;
+  }
+  #pic-number.visible { display: block; }
+
+  /* Answer overlay */
+  #answer-overlay {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    pointer-events: none;
+  }
+  #answer-overlay.show { display: flex; }
+  #answer-overlay.correct { background: rgba(10,10,15,0.5); }
+  #answer-overlay.wrong   { background: rgba(10,10,15,0.78); }
+
+  #answer-label { font-size: 0.75rem; letter-spacing: 4px; text-transform: uppercase; }
+  #answer-overlay.correct #answer-label { color: rgba(255,255,255,0.5); }
+  #answer-overlay.wrong   #answer-label { color: rgba(232,74,74,0.7); }
+
+  #answer-text {
+    font-family: 'Bebas Neue', sans-serif; font-size: 4.5rem;
+    letter-spacing: 6px; line-height: 1; text-align: center; padding: 0 24px;
+  }
+  #answer-overlay.correct #answer-text { color: #ffffff; text-shadow: 0 0 40px rgba(255,255,255,0.35); }
+  #answer-overlay.wrong   #answer-text { color: var(--danger); text-shadow: 0 0 40px rgba(232,74,74,0.6); }
+
+  #pass-tick {
+    font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem;
+    letter-spacing: 3px; color: var(--warning); margin-top: 12px;
+  }
+
+  /* ── BOTTOM BAR ── */
+  #bottombar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; padding: 14px 24px;
+    background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .action-btn {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 3px;
+    padding: 12px 36px; border: none; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .action-btn:active:not(:disabled) { transform: scale(0.97); }
+
+  #correct-btn {
+    background: var(--accent); color: var(--bg); font-size: 1.5rem; padding: 14px 48px;
+    box-shadow: 0 4px 24px rgba(232,196,74,0.3);
+  }
+  #correct-btn:hover:not(:disabled) { background: #f0d060; box-shadow: 0 4px 36px rgba(232,196,74,0.55); }
+  #pass-btn { background: transparent; border: 2px solid var(--danger); color: var(--danger); }
+  #pass-btn:hover:not(:disabled) { background: var(--danger); color: var(--bg); }
+  #reset-btn { background: transparent; border: 2px solid var(--muted); color: var(--muted); font-size: 1rem; padding: 10px 24px; }
+  #reset-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* ── WINNER OVERLAY ── */
+  #winner-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(10,10,15,0.9); z-index: 100;
+    flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  }
+  #winner-overlay.show { display: flex; }
+  #winner-text { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 6px; color: var(--muted); }
+  #winner-name { font-family: 'Bebas Neue', sans-serif; font-size: 6rem; letter-spacing: 8px; color: var(--accent); text-shadow: 0 0 60px rgba(232,196,74,0.6); line-height: 1; }
+  #winner-sub  { font-size: 0.9rem; letter-spacing: 3px; color: var(--muted); }
+  #winner-close {
+    margin-top: 16px; font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 3px;
+    background: transparent; border: 2px solid var(--accent); color: var(--accent);
+    padding: 10px 32px; border-radius: 4px; cursor: pointer;
+  }
+  #winner-close:hover { background: var(--accent); color: var(--bg); }
+
+  @keyframes flash-border { 0%,100%{box-shadow:none} 50%{box-shadow:inset 0 0 0 3px var(--danger)} }
+  .time-up { animation: flash-border 0.6s ease-in-out 3; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="logo">THE FLOOR</div>
+  <div id="category-controls">
+    <span id="category-label">Category:</span>
+    <select id="category-select"><option value="">— load floor.csv first —</option></select>
+    <button id="load-btn" onclick="loadCSV()">📂 Load floor.csv</button>
+  </div>
+  <div id="img-counter">— / —</div>
+</div>
+
+<div id="main">
+
+  <div class="player-panel" id="player1-panel">
+    <input class="player-name-input" id="p1-name" value="PLAYER 1" maxlength="16" />
+    <div class="clock-wrap">
+      <div class="clock" id="p1-clock">0:45</div>
+      <div class="clock-label">seconds remaining</div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-label">SCORE</div>
+      <div class="score" id="p1-score">0</div>
+    </div>
+    <div class="active-indicator" id="p1-dot"></div>
+  </div>
+
+  <div id="image-area">
+    <div id="placeholder">
+      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      <p>LOAD FLOOR.CSV TO BEGIN</p>
+    </div>
+    <div id="get-ready">
+      <div id="get-ready-category"></div>
+      <div id="get-ready-title">GET READY</div>
+      <div id="get-ready-pics"></div>
+      <button id="start-btn" onclick="startRound()">&#9654; START</button>
+    </div>
+    <img id="picture-display" alt="Quiz picture" />
+    <div id="pic-number"></div>
+    <div id="answer-overlay">
+      <div id="answer-label">ANSWER</div>
+      <div id="answer-text"></div>
+      <div id="pass-tick"></div>
+    </div>
+  </div>
+
+  <div class="player-panel" id="player2-panel">
+    <input class="player-name-input" id="p2-name" value="PLAYER 2" maxlength="16" />
+    <div class="clock-wrap">
+      <div class="clock" id="p2-clock">0:45</div>
+      <div class="clock-label">seconds remaining</div>
+    </div>
+    <div class="score-wrap">
+      <div class="score-label">SCORE</div>
+      <div class="score" id="p2-score">0</div>
+    </div>
+    <div class="active-indicator" id="p2-dot"></div>
+  </div>
+
+</div>
+
+<div id="bottombar">
+  <button class="action-btn" id="pass-btn" onclick="passQuestion()" disabled>PASS (&#8722;3s)</button>
+  <button class="action-btn" id="correct-btn" onclick="correctAnswer()" disabled>&#10003; CORRECT</button>
+  <button class="action-btn" id="reset-btn" onclick="resetRound(false)">RESET ROUND</button>
+</div>
+
+<div id="winner-overlay">
+  <div id="winner-text"></div>
+  <div id="winner-name"></div>
+  <div id="winner-sub"></div>
+  <button id="winner-close" onclick="closeWinner()">NEW ROUND</button>
+</div>
+
+<script>
+const ROUND_TIME   = 45;
+const PASS_PENALTY = 3;
+
+let rootDirHandle = null;
+let allQuestions  = [];
+let categories    = {};
+let pictures      = [];
+let picIndex      = 0;
+
+let active              = 1;
+let times               = [0, ROUND_TIME * 1000, ROUND_TIME * 1000];
+let scores              = [0, 0, 0];
+let running             = false;
+let gameOver            = false;
+let timerHandle         = null;
+let passing             = false;
+let passInterval        = null;
+let passRemain          = 0;
+let answerTimeout       = null;
+
+// ── IDB ──────────────────────────────────────────────────────────────────────
+const IDB_NAME = 'thefloor', IDB_STORE = 'handles', IDB_KEY = 'rootDir';
+function openDB() {
+  return new Promise((res,rej) => {
+    const r = indexedDB.open(IDB_NAME,1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = e => rej(e.target.error);
+  });
+}
+async function saveHandle(h) {
+  const db = await openDB();
+  return new Promise((res,rej) => {
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(h, IDB_KEY);
+    tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
+  });
+}
+async function loadSavedHandle() {
+  try {
+    const db = await openDB();
+    return new Promise((res,rej) => {
+      const tx  = db.transaction(IDB_STORE,'readonly');
+      const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  } catch { return null; }
+}
+
+// ── CSV ───────────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines   = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const imgCol  = headers.indexOf('@image');
+  const ansCol  = headers.indexOf('answer');
+  if (imgCol === -1 || ansCol === -1) { alert('CSV must have @image and answer columns.'); return []; }
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    const path = cols[imgCol]?.trim();
+    const ans  = cols[ansCol]?.trim();
+    if (path && ans) rows.push({ path, answer: ans });
+  }
+  return rows;
+}
+
+function buildCategories(rows) {
+  categories = {};
+  for (const row of rows) {
+    const cat = row.path.split('/')[0];
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(row);
+  }
+  const sel = document.getElementById('category-select');
+  sel.innerHTML = '<option value="">— select category —</option>';
+  for (const name of Object.keys(categories).sort()) {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  }
+}
+
+async function findCSV(dirHandle) {
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'file' && name.toLowerCase() === 'floor.csv') return handle;
+  }
+  return null;
+}
+
+async function processDir(dirHandle) {
+  rootDirHandle = dirHandle;
+  const csvHandle = await findCSV(dirHandle);
+  if (!csvHandle) { alert('No floor.csv found in that folder.'); return false; }
+  const text = await (await csvHandle.getFile()).text();
+  allQuestions = parseCSV(text);
+  if (allQuestions.length === 0) return false;
+  buildCategories(allQuestions);
+  document.getElementById('load-btn').textContent = '📂 Change Folder';
+  return true;
+}
+
+async function loadCSV() {
+  try {
+    const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    if (await processDir(dirHandle)) await saveHandle(dirHandle);
+  } catch(e) { if (e.name !== 'AbortError') console.error(e); }
+}
+
+// ── CATEGORY SELECTION ────────────────────────────────────────────────────────
+document.getElementById('category-select').addEventListener('change', function() {
+  const name = this.value;
+  if (!name) return;
+  pictures = categories[name] || [];
+  resetRound(true);
+  if (pictures.length > 0) showGetReady(name);
+  else alert('No pictures found for this category.');
+});
+
+// ── IMAGE DISPLAY ─────────────────────────────────────────────────────────────
+async function showPicture(idx) {
+  if (!pictures.length) return;
+  picIndex = idx;
+  const q     = pictures[idx];
+  const parts = q.path.split('/');
+  try {
+    let handle = rootDirHandle;
+    for (let i = 0; i < parts.length - 1; i++)
+      handle = await handle.getDirectoryHandle(parts[i]);
+    const fh   = await handle.getFileHandle(parts[parts.length - 1]);
+    const url  = URL.createObjectURL(await fh.getFile());
+    const img  = document.getElementById('picture-display');
+    img.onload = () => URL.revokeObjectURL(url);
+    img.src    = url;
+    img.classList.add('visible');
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('get-ready').classList.remove('show');
+    const badge = document.getElementById('pic-number');
+    badge.textContent = `# ${idx + 1}`;
+    badge.classList.add('visible');
+  } catch(e) { console.error('Cannot load image:', q.path, e); }
+  updateCounter();
+}
+
+function nextPicture() {
+  if (picIndex + 1 < pictures.length) showPicture(picIndex + 1);
+  else endRound('pictures');
+}
+
+function updateCounter() {
+  document.getElementById('img-counter').textContent =
+    pictures.length ? `${picIndex + 1} / ${pictures.length}` : '— / —';
+}
+
+// ── ANSWER OVERLAY ────────────────────────────────────────────────────────────
+function showAnswer(mode) {
+  const overlay = document.getElementById('answer-overlay');
+  const textEl  = document.getElementById('answer-text');
+  const tickEl  = document.getElementById('pass-tick');
+  const answer  = pictures[picIndex]?.answer || '';
+
+  clearTimeout(answerTimeout);
+  clearInterval(passInterval);
+  overlay.className = '';
+  overlay.classList.add('show', mode === 'correct' ? 'correct' : 'wrong');
+  document.getElementById('answer-label').textContent = mode === 'correct' ? 'CORRECT!' : 'PASS';
+  textEl.textContent = answer;
+  tickEl.textContent = '';
+
+  if (mode === 'correct') {
+    stopTimer();
+    answerTimeout = setTimeout(() => {
+      overlay.className = '';
+      scores[active]++;
+      document.getElementById(`p${active}-score`).textContent = scores[active];
+      switchActive();
+      nextPicture();
+      if (!gameOver) startTimer();
+    }, 1000);
+
+  } else {
+    // Deduct 3s immediately, show answer + countdown, same player continues
+    times[active] = Math.max(0, times[active] - PASS_PENALTY * 1000);
+    updateClocks();
+    if (times[active] === 0) {
+      overlay.className = '';
+      stopTimer();
+      endRound('timeout');
+      return;
+    }
+    passing = true;
+    enableButtons(false);
+    passRemain = PASS_PENALTY;
+    tickEl.textContent = passRemain;
+    passInterval = setInterval(() => {
+      passRemain--;
+      tickEl.textContent = passRemain > 0 ? passRemain : '';
+      if (passRemain <= 0) {
+        clearInterval(passInterval);
+        overlay.className = '';
+        passing = false;
+        enableButtons(true);
+        nextPicture();
+        // Same player continues — no switch
+      }
+    }, 1000);
+  }
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+function startTimer() {
+  if (running) return;
+  running = true;
+  timerHandle = setInterval(tick, 100);
+}
+function stopTimer() {
+  running = false;
+  clearInterval(timerHandle);
+  timerHandle = null;
+}
+function tick() {
+  if (gameOver) return;
+  times[active] -= 100;
+  if (times[active] < 0) times[active] = 0;
+  updateClocks();
+  if (times[active] === 0) {
+    stopTimer();
+    document.getElementById(`player${active}-panel`).classList.add('time-up');
+    endRound('timeout');
+  }
+}
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+}
+function updateClocks() {
+  for (let p = 1; p <= 2; p++) {
+    const el = document.getElementById(`p${p}-clock`);
+    el.textContent = formatTime(times[p]);
+    el.classList.remove('warning','danger');
+    if (times[p] <= 10000 && times[p] > 5000) el.classList.add('warning');
+    if (times[p] <= 5000)                      el.classList.add('danger');
+  }
+}
+
+// ── GAME LOGIC ────────────────────────────────────────────────────────────────
+function switchActive() {
+  active = active === 1 ? 2 : 1;
+  document.getElementById('player1-panel').className = 'player-panel' + (active === 1 ? ' active-p1' : '');
+  document.getElementById('player2-panel').className = 'player-panel' + (active === 2 ? ' active-p2' : '');
+}
+
+function correctAnswer() { if (!gameOver && !passing) showAnswer('correct'); }
+function passQuestion()   { if (!gameOver && !passing && pictures.length) showAnswer('pass'); }
+
+function showGetReady(categoryName) {
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('picture-display').classList.remove('visible');
+  document.getElementById('pic-number').classList.remove('visible');
+  document.getElementById('answer-overlay').className = '';
+  document.getElementById('get-ready-category').textContent = `CATEGORY: ${categoryName.toUpperCase()}`;
+  document.getElementById('get-ready-pics').textContent = `${pictures.length} PICTURE${pictures.length !== 1 ? 'S' : ''}`;
+  document.getElementById('get-ready').classList.add('show');
+  enableButtons(false);
+}
+
+function startRound() {
+  document.getElementById('get-ready').classList.remove('show');
+  showPicture(0);
+  enableButtons(true);
+  startTimer();
+}
+
+function resetRound(suppressStart) {
+  stopTimer();
+  clearInterval(passInterval);
+  clearTimeout(answerTimeout);
+  gameOver = false; passing = false; running = false;
+  times  = [0, ROUND_TIME * 1000, ROUND_TIME * 1000];
+  scores = [0, 0, 0];
+  document.getElementById('p1-score').textContent = '0';
+  document.getElementById('p2-score').textContent = '0';
+  active = 1;
+  document.getElementById('answer-overlay').className = '';
+  document.getElementById('winner-overlay').classList.remove('show');
+  document.getElementById('player1-panel').className = 'player-panel active-p1';
+  document.getElementById('player2-panel').className = 'player-panel';
+  document.getElementById('player1-panel').classList.remove('time-up');
+  document.getElementById('player2-panel').classList.remove('time-up');
+  updateClocks();
+  if (!suppressStart) {
+    if (pictures.length > 0) { picIndex = 0; showGetReady(document.getElementById('category-select').value || ''); }
+    else { document.getElementById('get-ready').classList.remove('show'); document.getElementById('placeholder').style.display = ''; }
+  }
+  updateCounter();
+}
+
+function enableButtons(on) {
+  document.getElementById('correct-btn').disabled = !on;
+  document.getElementById('pass-btn').disabled = !on;
+}
+
+function endRound(reason) {
+  stopTimer(); gameOver = true; enableButtons(false);
+  const nameEl = document.getElementById('winner-name');
+  const textEl = document.getElementById('winner-text');
+  const subEl  = document.getElementById('winner-sub');
+  if (reason === 'pictures') {
+    textEl.textContent = 'ALL PICTURES DONE';
+    const w = scores[1] > scores[2] ? 1 : scores[2] > scores[1] ? 2 : 0;
+    if (w === 0) { nameEl.textContent = 'DRAW'; subEl.textContent = 'EQUAL SCORES'; }
+    else { nameEl.textContent = document.getElementById(`p${w}-name`).value.toUpperCase(); subEl.textContent = 'WINS THE ROUND'; }
+  } else {
+    const w = active === 1 ? 2 : 1;
+    textEl.textContent = `${document.getElementById(`p${active}-name`).value.toUpperCase()} IS OUT OF TIME`;
+    nameEl.textContent = document.getElementById(`p${w}-name`).value.toUpperCase();
+    subEl.textContent  = 'WINS THE ROUND';
+  }
+  document.getElementById('winner-overlay').classList.add('show');
+}
+
+function closeWinner() {
+  document.getElementById('winner-overlay').classList.remove('show');
+  resetRound(false);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+updateClocks();
+document.getElementById('player1-panel').classList.add('active-p1');
+
+(async () => {
+  const saved = await loadSavedHandle();
+  if (!saved) return;
+  try {
+    let perm = await saved.queryPermission({ mode: 'read' });
+    if (perm !== 'granted') perm = await saved.requestPermission({ mode: 'read' });
+    if (perm === 'granted') await processDir(saved);
+  } catch { /* stale — ignore */ }
+})();
+</script>
+</body>
+</html>
