@@ -238,6 +238,33 @@
 
   @keyframes flash-border { 0%,100%{box-shadow:none} 50%{box-shadow:inset 0 0 0 3px var(--danger)} }
   .time-up { animation: flash-border 0.6s ease-in-out 3; }
+
+  /* ── DUAL SCREEN ── */
+  #qm-answer {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
+    background: rgba(10,10,15,0.88); border-top: 1px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+  }
+  #qm-answer-label { font-size: 0.65rem; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; flex-shrink: 0; }
+  #qm-answer-text  { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 4px; color: var(--accent); }
+
+  #player-btn {
+    background: transparent; border: 1px solid var(--muted); color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 700;
+    letter-spacing: 2px; padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.2s; white-space: nowrap;
+  }
+  #player-btn:hover { border-color: var(--text); color: var(--text); }
+
+  body.player #bottombar,
+  body.player #load-btn,
+  body.player #category-controls,
+  body.player #player-btn,
+  body.player #start-btn,
+  body.player #winner-close,
+  body.player #qm-answer { display: none !important; }
+  body.player .player-name-input { pointer-events: none; }
+  body.player #placeholder { display: none !important; }
 </style>
 </head>
 <body>
@@ -250,6 +277,7 @@
     <button id="load-btn" onclick="loadCSV()">📂 Load floor.csv</button>
   </div>
   <div id="img-counter">— / —</div>
+  <button id="player-btn" onclick="openPlayerWindow()">📺 Player Screen</button>
 </div>
 
 <div id="main">
@@ -295,6 +323,10 @@
       <div id="answer-text"></div>
       <div id="pass-tick"></div>
     </div>
+    <div id="qm-answer">
+      <span id="qm-answer-label">Answer</span>
+      <span id="qm-answer-text">—</span>
+    </div>
   </div>
 
   <div class="player-panel" id="player2-panel">
@@ -326,25 +358,32 @@
 </div>
 
 <script>
+// ── ROLE & CHANNEL ────────────────────────────────────────────────────────────
+const role    = new URLSearchParams(location.search).get('role') || 'qm';
+const channel = new BroadcastChannel('thefloor');
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const ROUND_TIME   = 45;
 const PASS_PENALTY = 3;
 
+// ── STATE (QM only) ───────────────────────────────────────────────────────────
 let rootDirHandle = null;
 let allQuestions  = [];
 let categories    = {};
 let pictures      = [];
 let picIndex      = 0;
 
-let active              = 1;
-let times               = [0, ROUND_TIME * 1000, ROUND_TIME * 1000];
-let scores              = [0, 0, 0];
-let running             = false;
-let gameOver            = false;
-let timerHandle         = null;
-let passing             = false;
-let passInterval        = null;
-let passRemain          = 0;
-let answerTimeout       = null;
+let active        = 1;
+let times         = [0, ROUND_TIME * 1000, ROUND_TIME * 1000];
+let scores        = [0, 0, 0];
+let running       = false;
+let gameOver      = false;
+let timerHandle   = null;
+let passing       = false;
+let passInterval  = null;
+let passRemain    = 0;
+let answerTimeout = null;
+let lastImageData = null;
 
 // ── IDB ──────────────────────────────────────────────────────────────────────
 const IDB_NAME = 'thefloor', IDB_STORE = 'handles', IDB_KEY = 'rootDir';
@@ -477,23 +516,32 @@ async function showPicture(idx) {
     if (!fh) {
       document.getElementById('img-error-path').textContent = q.path;
       document.getElementById('img-error').classList.add('show');
+      channel.postMessage({ type: 'img-error', path: q.path });
     } else {
-      const url = URL.createObjectURL(await fh.getFile());
-      const img = document.getElementById('picture-display');
+      const file   = await fh.getFile();
+      const buffer = await file.arrayBuffer();
+      const mime   = file.type || 'image/jpeg';
+      const url    = URL.createObjectURL(new Blob([buffer], { type: mime }));
+      const img    = document.getElementById('picture-display');
       img.onload = () => URL.revokeObjectURL(url);
       img.src    = url;
       img.classList.add('visible');
+      lastImageData = { buffer, mime, idx };
+      channel.postMessage({ type: 'image', buffer, mime, idx });
     }
   } catch(e) {
     console.error('Cannot load image:', q.path, e);
     document.getElementById('img-error-path').textContent = q.path;
     document.getElementById('img-error').classList.add('show');
+    channel.postMessage({ type: 'img-error', path: q.path });
   }
 
   const badge = document.getElementById('pic-number');
   badge.textContent = `# ${idx + 1}`;
   badge.classList.add('visible');
+  document.getElementById('qm-answer-text').textContent = q.answer;
   updateCounter();
+  broadcastState();
 }
 
 function nextPicture() {
@@ -523,6 +571,7 @@ function showAnswer(mode) {
 
   if (mode === 'correct') {
     stopTimer();
+    broadcastState();
     answerTimeout = setTimeout(() => {
       overlay.className = '';
       scores[active]++;
@@ -537,9 +586,11 @@ function showAnswer(mode) {
     enableButtons(false);
     passRemain = PASS_PENALTY;
     tickEl.textContent = passRemain;
+    broadcastState();
     passInterval = setInterval(() => {
       passRemain--;
       tickEl.textContent = passRemain > 0 ? passRemain : '';
+      broadcastState();
       if (passRemain <= 0) {
         clearInterval(passInterval);
         overlay.className = '';
@@ -567,6 +618,7 @@ function tick() {
   times[active] -= 100;
   if (times[active] < 0) times[active] = 0;
   updateClocks();
+  broadcastState();
   if (times[active] === 0) {
     stopTimer();
     document.getElementById(`player${active}-panel`).classList.add('time-up');
@@ -605,7 +657,9 @@ function showGetReady(categoryName) {
   document.getElementById('get-ready-category').textContent = `CATEGORY: ${categoryName.toUpperCase()}`;
   document.getElementById('get-ready-pics').textContent = `${pictures.length} PICTURE${pictures.length !== 1 ? 'S' : ''}`;
   document.getElementById('get-ready').classList.add('show');
+  document.getElementById('qm-answer-text').textContent = '—';
   enableButtons(false);
+  broadcastState();
 }
 
 function startRound() {
@@ -637,6 +691,7 @@ function resetRound(suppressStart) {
     else { document.getElementById('get-ready').classList.remove('show'); document.getElementById('placeholder').style.display = ''; }
   }
   updateCounter();
+  broadcastState();
 }
 
 function enableButtons(on) {
@@ -661,6 +716,7 @@ function endRound(reason) {
     subEl.textContent  = 'WINS THE ROUND';
   }
   document.getElementById('winner-overlay').classList.add('show');
+  broadcastState();
 }
 
 function closeWinner() {
@@ -668,24 +724,150 @@ function closeWinner() {
   resetRound(false);
 }
 
+// ── BROADCAST ────────────────────────────────────────────────────────────────
+function snapshot() {
+  const overlay = document.getElementById('answer-overlay');
+  const winEl   = document.getElementById('winner-overlay');
+  return {
+    times, scores, active, picIndex,
+    picCount: pictures.length,
+    p1Name: document.getElementById('p1-name').value,
+    p2Name: document.getElementById('p2-name').value,
+    phase: document.getElementById('get-ready').classList.contains('show') ? 'getready'
+         : winEl.classList.contains('show') ? 'over'
+         : gameOver ? 'over' : 'playing',
+    category: document.getElementById('category-select').value,
+    answerOverlay: overlay.classList.contains('show') ? {
+      show: true,
+      mode: overlay.classList.contains('correct') ? 'correct' : 'pass',
+      answer: document.getElementById('answer-text').textContent,
+      passRemain,
+    } : { show: false },
+    winner: winEl.classList.contains('show') ? {
+      show: true,
+      text: document.getElementById('winner-text').textContent,
+      name: document.getElementById('winner-name').textContent,
+      sub:  document.getElementById('winner-sub').textContent,
+    } : { show: false },
+    timeUp: [
+      false,
+      document.getElementById('player1-panel').classList.contains('time-up'),
+      document.getElementById('player2-panel').classList.contains('time-up'),
+    ],
+  };
+}
+
+function broadcastState() {
+  if (role !== 'qm') return;
+  channel.postMessage({ type: 'state', ...snapshot() });
+}
+
+// ── PLAYER DISPLAY ────────────────────────────────────────────────────────────
+function applyState(s) {
+  for (let p = 1; p <= 2; p++) {
+    const el = document.getElementById(`p${p}-clock`);
+    el.textContent = formatTime(s.times[p]);
+    el.classList.remove('warning','danger');
+    if (s.times[p] <= 10000 && s.times[p] > 5000) el.classList.add('warning');
+    if (s.times[p] <= 5000)                        el.classList.add('danger');
+  }
+  document.getElementById('p1-score').textContent = s.scores[1];
+  document.getElementById('p2-score').textContent = s.scores[2];
+  document.getElementById('p1-name').value = s.p1Name;
+  document.getElementById('p2-name').value = s.p2Name;
+  document.getElementById('player1-panel').className =
+    'player-panel' + (s.active === 1 ? ' active-p1' : '') + (s.timeUp[1] ? ' time-up' : '');
+  document.getElementById('player2-panel').className =
+    'player-panel' + (s.active === 2 ? ' active-p2' : '') + (s.timeUp[2] ? ' time-up' : '');
+  document.getElementById('pic-number').textContent = `# ${s.picIndex + 1}`;
+  document.getElementById('img-counter').textContent =
+    s.picCount ? `${s.picIndex + 1} / ${s.picCount}` : '— / —';
+  if (s.phase === 'getready') {
+    document.getElementById('get-ready-category').textContent = `CATEGORY: ${s.category.toUpperCase()}`;
+    document.getElementById('get-ready-pics').textContent = `${s.picCount} PICTURE${s.picCount !== 1 ? 'S' : ''}`;
+    document.getElementById('get-ready').classList.add('show');
+    document.getElementById('picture-display').classList.remove('visible');
+    document.getElementById('img-error').classList.remove('show');
+    document.getElementById('pic-number').classList.remove('visible');
+  } else {
+    document.getElementById('get-ready').classList.remove('show');
+  }
+  const overlay = document.getElementById('answer-overlay');
+  if (s.answerOverlay.show) {
+    const ao = s.answerOverlay;
+    overlay.className = '';
+    overlay.classList.add('show', ao.mode === 'correct' ? 'correct' : 'wrong');
+    document.getElementById('answer-label').textContent = ao.mode === 'correct' ? 'CORRECT!' : 'PASS';
+    document.getElementById('answer-text').textContent  = ao.answer;
+    document.getElementById('pass-tick').textContent    = ao.passRemain > 0 ? ao.passRemain : '';
+  } else {
+    overlay.className = '';
+  }
+  const winEl = document.getElementById('winner-overlay');
+  if (s.winner.show) {
+    document.getElementById('winner-text').textContent = s.winner.text;
+    document.getElementById('winner-name').textContent = s.winner.name;
+    document.getElementById('winner-sub').textContent  = s.winner.sub;
+    winEl.classList.add('show');
+  } else {
+    winEl.classList.remove('show');
+  }
+}
+
+// ── DUAL SCREEN ───────────────────────────────────────────────────────────────
+function openPlayerWindow() {
+  window.open(location.href.split('?')[0] + '?role=player', 'thefloor-player', 'width=1280,height=800');
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 updateClocks();
 document.getElementById('player1-panel').classList.add('active-p1');
 
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space') correctAnswer();
-  if (e.key.toLowerCase() === 'p') passQuestion();
-});
-
-(async () => {
-  const saved = await loadSavedHandle();
-  if (!saved) return;
-  try {
-    let perm = await saved.queryPermission({ mode: 'read' });
-    if (perm !== 'granted') perm = await saved.requestPermission({ mode: 'read' });
-    if (perm === 'granted') await processDir(saved);
-  } catch { /* stale — ignore */ }
-})();
+if (role === 'qm') {
+  openPlayerWindow();
+  channel.onmessage = e => {
+    if (e.data.type !== 'hello') return;
+    broadcastState();
+    if (lastImageData) channel.postMessage({ type: 'image', ...lastImageData });
+  };
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') correctAnswer();
+    if (e.key.toLowerCase() === 'p') passQuestion();
+  });
+  (async () => {
+    const saved = await loadSavedHandle();
+    if (!saved) return;
+    try {
+      let perm = await saved.queryPermission({ mode: 'read' });
+      if (perm !== 'granted') perm = await saved.requestPermission({ mode: 'read' });
+      if (perm === 'granted') await processDir(saved);
+    } catch { /* stale — ignore */ }
+  })();
+} else {
+  document.body.classList.add('player');
+  document.title = 'THE FLOOR — Player Screen';
+  channel.onmessage = e => {
+    const msg = e.data;
+    if (msg.type === 'image') {
+      const url = URL.createObjectURL(new Blob([msg.buffer], { type: msg.mime || 'image/jpeg' }));
+      const img = document.getElementById('picture-display');
+      if (img._blobUrl) URL.revokeObjectURL(img._blobUrl);
+      img._blobUrl = url;
+      img.src = url;
+      img.classList.add('visible');
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('img-error').classList.remove('show');
+      document.getElementById('pic-number').classList.add('visible');
+    } else if (msg.type === 'img-error') {
+      document.getElementById('picture-display').classList.remove('visible');
+      document.getElementById('img-error-path').textContent = msg.path;
+      document.getElementById('img-error').classList.add('show');
+    } else if (msg.type === 'state') {
+      applyState(msg);
+    }
+  };
+  channel.postMessage({ type: 'hello' });
+}
 </script>
 </body>
 </html>
