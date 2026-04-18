@@ -297,7 +297,7 @@
 </div>
 
 <div id="bottombar">
-  <button class="action-btn" id="pass-btn" onclick="passQuestion()" disabled>PASS (&#8722;3s)</button>
+  <button class="action-btn" id="pass-btn" onclick="passQuestion()" disabled>PASS</button>
   <button class="action-btn" id="correct-btn" onclick="correctAnswer()" disabled>&#10003; CORRECT</button>
   <button class="action-btn" id="reset-btn" onclick="resetRound(false)">RESET ROUND</button>
 </div>
@@ -492,15 +492,6 @@ function showAnswer(mode) {
     }, 1000);
 
   } else {
-    // Deduct 3s immediately, show answer + countdown, same player continues
-    times[active] = Math.max(0, times[active] - PASS_PENALTY * 1000);
-    updateClocks();
-    if (times[active] === 0) {
-      overlay.className = '';
-      stopTimer();
-      endRound('timeout');
-      return;
-    }
     passing = true;
     enableButtons(false);
     passRemain = PASS_PENALTY;
@@ -514,7 +505,6 @@ function showAnswer(mode) {
         passing = false;
         enableButtons(true);
         nextPicture();
-        // Same player continues — no switch
       }
     }, 1000);
   }
@@ -640,6 +630,11 @@ function closeWinner() {
 // ── INIT ──────────────────────────────────────────────────────────────────────
 updateClocks();
 document.getElementById('player1-panel').classList.add('active-p1');
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') correctAnswer();
+  if (e.key.toLowerCase() === 'p') passQuestion();
+});
 
 (async () => {
   const saved = await loadSavedHandle();
