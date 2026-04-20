@@ -1,51 +1,47 @@
-# Generate Test floor.csv
+# Generate Test Data
 
 ## Task
 
-Scan the game folder's directory structure and generate a `floor.csv` file suitable for testing the THE FLOOR picture quiz game. Make up plausible one-or-two-word answers for each image based on the filename.
+For each category specified by the user, fetch 45 images from the web, save them into numbered folders, and generate a `floor.csv` with the correct answer for each image.
 
 ## Instructions
 
-1. **Scan the directory** containing `the-floor.html` for sub-folders. Each sub-folder is a category.
+### 1. Get categories from the user
 
-2. **Within each category folder**, find all image files with extensions: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp` (case-insensitive).
+Ask the user which categories they want to generate (e.g. "F1 Drivers", "Capital Cities", "Dog Breeds"). Each category becomes a folder.
 
-3. **Derive a test answer** from the image filename:
-   - Strip the file extension
-   - Replace underscores and hyphens with spaces
-   - Convert to Title Case
-   - Remove any leading numbers and dots (e.g. `1.` or `01_`)
-   - Keep it to 1–2 words where possible — if the filename is long, use just the first meaningful word or two
-   - Examples: `Giant_Panda.jpg` → `Giant Panda`, `01_eiffel_tower.jpg` → `Eiffel Tower`, `lion.jpg` → `Lion`
+### 2. For each category, find 45 subjects
 
-4. **Write `floor.csv`** to the same folder as `the-floor.html` with the following format:
+Come up with 45 distinct, well-known subjects that fit the category. For example, for "F1 Drivers": Lewis Hamilton, Max Verstappen, Ayrton Senna, etc.
 
-```
-@image,answer
-category/filename.jpg,Answer
-```
+### 3. Fetch an image for each subject
 
-   - The `@image` column must be the relative path: `category folder name/image filename` (use the exact folder and file names as found on disk, preserving case)
-   - No quotes needed unless a value contains a comma
-   - Include a header row exactly as shown above
+For each subject, search the web for a clear, recognisable image (a photo or illustration where the subject is easily identifiable). Download the image file.
 
-5. **Sort** the output: alphabetically by category, then by filename within each category.
+- Save it into a sub-folder named after the category (e.g. `F1 Drivers/`)
+- Number the files sequentially: `1.jpg`, `2.png`, `3.jpg`, etc. — use the actual file extension of the downloaded image
+- Use only supported formats: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`
 
-## Example Output
+### 4. Write floor.csv
+
+Write a `floor.csv` file in the same folder as `the-floor.html` with the following format:
 
 ```csv
 @image,answer
-animals/Giant_Panda.jpg,Giant Panda
-animals/lion.jpg,Lion
-landmarks/01_eiffel_tower.jpg,Eiffel Tower
-landmarks/02_big_ben.jpg,Big Ben
+F1 Drivers/1.jpg,Lewis Hamilton
+F1 Drivers/2.jpg,Max Verstappen
 ```
+
+- Header row must be exactly `@image,answer`
+- The `@image` path is `category folder/filename.ext` — match the exact folder and file names on disk
+- The `answer` is the subject's name (1–2 words where possible)
+- Sort: alphabetically by category, then numerically by filename within each category
+- If a category folder already exists, append to it and update the CSV accordingly
+- Update `floor.csv` if it already exists, preserving any existing entries
 
 ## Notes
 
-- Do not recurse deeper than one level — only immediate sub-folders of the game folder are categories
-- Skip any files that are not images (e.g. `.csv`, `.html`, `.md`)
-- Skip the game folder's own files at the root level
-- If the folder is empty or has no images, skip it silently
-- Overwrite `floor.csv` if it already exists
-- Print a summary when done: number of categories found, total images added
+- Prefer images with a plain or simple background where the subject is clearly identifiable
+- Avoid images with text overlays, watermarks, or collages
+- If an image cannot be fetched for a subject, skip it and try another subject so the folder always has 45 images
+- Print a summary when done: categories generated, images downloaded per category, any subjects skipped

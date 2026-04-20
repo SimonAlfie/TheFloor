@@ -706,8 +706,8 @@ function endRound(reason) {
   const subEl  = document.getElementById('winner-sub');
   if (reason === 'pictures') {
     textEl.textContent = 'ALL PICTURES DONE';
-    const w = scores[1] > scores[2] ? 1 : scores[2] > scores[1] ? 2 : 0;
-    if (w === 0) { nameEl.textContent = 'DRAW'; subEl.textContent = 'EQUAL SCORES'; }
+    const w = times[1] > times[2] ? 1 : times[2] > times[1] ? 2 : 0;
+    if (w === 0) { nameEl.textContent = 'DRAW'; subEl.textContent = 'EQUAL TIME REMAINING'; }
     else { nameEl.textContent = document.getElementById(`p${w}-name`).value.toUpperCase(); subEl.textContent = 'WINS THE ROUND'; }
   } else {
     const w = active === 1 ? 2 : 1;

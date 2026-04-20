@@ -79,7 +79,7 @@ The player window opens automatically when the QM window loads. Both windows sta
 5. Press **✓ Correct** (or **Space**) when the active player gives the right answer — the clock pauses briefly, the answer flashes on screen, and play switches to the other player.
 6. Press **Pass** (or **P**) to skip the current image. The clock keeps running for 3 seconds while the answer is shown, then the same player continues.
 7. A player is eliminated when their clock reaches zero. The other player wins the round.
-8. If all pictures are used up before either player runs out of time, the player with the higher score wins.
+8. If all pictures are used up before either player runs out of time, the player with the most time remaining wins.
 
 ### Keyboard shortcuts
 
@@ -100,4 +100,4 @@ The player window opens automatically when the QM window loads. Both windows sta
 
 ## Generating a test CSV
 
-A helper script is included. See `generate-test-csv.md` for instructions — it scans your image folders and generates a `floor.csv` with placeholder answers derived from the filenames.
+`generate-test-csv.md` contains instructions for an AI coding agent (such as Claude Code) to automatically generate a full set of test data. Tell the agent which categories you want (e.g. "F1 Drivers", "Capital Cities") and it will fetch 45 images per category from the web, save them into category-named folders with numbered image files, and write a complete `floor.csv` with the correct answers — ready to play immediately.
